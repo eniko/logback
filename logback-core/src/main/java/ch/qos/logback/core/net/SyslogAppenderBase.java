@@ -38,10 +38,12 @@ public abstract class SyslogAppenderBase<E> extends AppenderBase<E> {
   Layout<E> layout;
   String facilityStr;
   String syslogHost;
+  String protocol = SyslogConstants.UDP_PROTOCOL;
   protected String suffixPattern;
   SyslogOutputStream sos;
   int port = SyslogConstants.SYSLOG_PORT;
 
+    @Override
   public void start() {
     int errorCount = 0;
     if (facilityStr == null) {
@@ -50,14 +52,22 @@ public abstract class SyslogAppenderBase<E> extends AppenderBase<E> {
     }
 
     try {
-      sos = new SyslogOutputStream(syslogHost, port);
+      if (protocol.equals(SyslogConstants.TCP_PROTOCOL)) {
+        sos = new SyslogTCPOutputStream(syslogHost, port);
+      }
+      else {
+        sos = new SyslogUDPOutputStream(syslogHost, port);
+      }
     } catch (UnknownHostException e) {
       addError("Could not create SyslogWriter", e);
       errorCount++;
     } catch (SocketException e) {
       addWarn(
-          "Failed to bind to a random datagram socket. Will try to reconnect later.",
+          "Failed to bind to socket. Will try to reconnect later.",
           e);
+    } catch (IOException e) {
+      addError("Could not create SyslogWriter", e);
+      errorCount++;
     }
 
     if (layout == null) {
@@ -73,7 +83,7 @@ public abstract class SyslogAppenderBase<E> extends AppenderBase<E> {
 
   abstract public int getSeverityForEvent(Object eventObject);
 
-  @Override
+    @Override
   protected void append(E eventObject) {
     if (!isStarted()) {
       return;
@@ -84,11 +94,11 @@ public abstract class SyslogAppenderBase<E> extends AppenderBase<E> {
       if (msg != null && msg.length() > MSG_SIZE_LIMIT) {
         msg = msg.substring(0, MSG_SIZE_LIMIT);
       }
-      sos.write(msg.getBytes());
+      ((OutputStream)sos).write(msg.getBytes());
       sos.flush();
-      postProcess(eventObject, sos);
+      postProcess(eventObject,(OutputStream) sos);
     } catch (IOException ioe) {
-      addError("Failed to send diagram to " + syslogHost, ioe);
+      addError("Failed to send message to " + syslogHost, ioe);
     }
   }
 
@@ -208,6 +218,14 @@ public abstract class SyslogAppenderBase<E> extends AppenderBase<E> {
     this.port = port;
   }
 
+  public String getProtocol() {
+    return protocol;
+  }
+
+  public void setProtocol(String protocol) {
+    this.protocol = protocol;
+  }
+
   public Layout<E> getLayout() {
     return layout;
   }
@@ -219,7 +237,12 @@ public abstract class SyslogAppenderBase<E> extends AppenderBase<E> {
 
   @Override
   public void stop() {
-    sos.close();
+    try {
+      sos.close();
+    }
+    catch (IOException e) {
+      addWarn("Error closing connection to syslog host", e);
+    }
     super.stop();
   }
 

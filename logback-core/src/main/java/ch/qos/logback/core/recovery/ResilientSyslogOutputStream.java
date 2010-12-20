@@ -13,25 +13,39 @@
  */
 package ch.qos.logback.core.recovery;
 
+import ch.qos.logback.core.net.SyslogConstants;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 
-import ch.qos.logback.core.net.SyslogOutputStream;
+import ch.qos.logback.core.net.SyslogUDPOutputStream;
+import ch.qos.logback.core.net.SyslogTCPOutputStream;
 
 public class ResilientSyslogOutputStream extends ResilientOutputStreamBase {
 
 
   String syslogHost;
   int port;
+  String protocol;
   
-  public ResilientSyslogOutputStream(String syslogHost, int port)
-      throws UnknownHostException, SocketException {
+  public ResilientSyslogOutputStream(String syslogHost, int port, String protocol)
+      throws UnknownHostException, SocketException, IOException {
     this.syslogHost = syslogHost;
     this.port = port;
-    super.os = new SyslogOutputStream(syslogHost, port);
+    this.protocol = protocol;
+    if (this.protocol.equals(SyslogConstants.TCP_PROTOCOL)) {
+        super.os = new SyslogTCPOutputStream(syslogHost, port);
+    }
+    else {
+        super.os = new SyslogUDPOutputStream(syslogHost, port);
+    }
     this.presumedClean = true;
+  }
+
+  public ResilientSyslogOutputStream(String syslogHost, int port)
+      throws UnknownHostException, SocketException, IOException {
+    this(syslogHost, port, SyslogConstants.UDP_PROTOCOL);
   }
 
   @Override
@@ -41,7 +55,14 @@ public class ResilientSyslogOutputStream extends ResilientOutputStreamBase {
 
   @Override
   OutputStream openNewOutputStream() throws IOException {
-    return  new SyslogOutputStream(syslogHost, port);
+    OutputStream out = null;
+    if (this.protocol.equals(SyslogConstants.TCP_PROTOCOL)) {
+        out = new SyslogTCPOutputStream(syslogHost, port);
+    }
+    else {
+        out = new SyslogUDPOutputStream(syslogHost, port);
+    }
+    return out;
   }
   
   @Override

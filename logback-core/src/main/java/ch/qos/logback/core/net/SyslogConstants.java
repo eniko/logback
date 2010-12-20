@@ -21,6 +21,8 @@ package ch.qos.logback.core.net;
 public class SyslogConstants {
   
   static public final int SYSLOG_PORT = 514;
+  static public final String UDP_PROTOCOL = "UDP";
+  static public final String TCP_PROTOCOL = "TCP";
   
   
   // Following constants extracted from RFC 3164, we multiply them by 8
